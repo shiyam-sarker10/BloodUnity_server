@@ -3,7 +3,7 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
 // middleware
@@ -140,6 +140,140 @@ async function run() {
       const result = await donorReqCollection.insertOne(user);
       res.send(result);
     })
+
+
+    // allReq 
+
+    app.get('/allRequest',async(req,res)=>{
+      try {
+        if (!req.query.email) {
+          return res.status(400).json({ error: "No email provided" });
+        }
+
+        const email = req.query.email;
+        const query = { email: email };
+        const result = await donorReqCollection.find(query).toArray();
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+      
+    })
+
+    //  SingleDonorReq 
+
+    app.get("/allRequest", verifyToken, async (req, res) => {
+      try {
+        if (!req.query.email) {
+          return res.status(400).json({ error: "No email provided" });
+        }
+
+        const email = req.query.email;
+        const query = { email: email };
+        const result = await donorReqCollection.find(query).toArray();
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+  // edit single req 
+
+    const { ObjectId } = require("mongodb");
+
+    app.put("/allRequest", async (req, res) => {
+      try {
+        const body = req.body;
+        if (!req.query.id) {
+          return res.status(408).json({ error: "No ID provided" });
+        }
+
+        const id = req.query.id;
+        console.log(id)
+        const filter = { _id: new ObjectId(id) }; 
+        const options = { upsert: true };
+
+        const updateDoc = {
+          $set: {
+            donationTime: body.donationTime,
+            upazila: body.upazila,
+            district: body.district,
+            donationDate: body.donationDate,
+            fullAddress: body.fullAddress,
+            hospitalName: body.hospitalName,
+            recipientName: body.recipientName,
+          },
+        };
+
+        const result = await donorReqCollection.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
+        res.json(result);
+      } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    // delete single Req 
+    app.delete("/allRequest", async (req, res) => {
+      try {
+        const body = req.body;
+        if (!req.query.id) {
+          return res.status(408).json({ error: "No ID provided" });
+        }
+
+        const id = req.query.id;
+        console.log(id);
+        const query = { _id: new ObjectId(id) };
+
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: {
+            workStatus: body.workStatus,
+          },
+        };
+        const result = await donorReqCollection.updateOne(
+          query,
+          updateDoc,
+          options
+        );
+        res.json(result);
+      } catch (error) {
+        console.error("Error Delete request:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+
+    // donor update working status 
+
+   app.patch("/allRequest", async (req, res) => {
+     try {
+       const body = req.body;
+       if (!req.query.id) {
+         return res.status(400).json({ error: "No ID provided" });
+       }
+
+       const id = req.query.id;
+       console.log(id);
+       const query = { _id: new ObjectId(id) };
+
+       const result = await donorReqCollection.updateOne(query, { $set: body });
+       res.json(result);
+     } catch (error) {
+       console.error("Error updating request:", error);
+       res.status(500).json({ error: "Internal server error" });
+     }
+   });
+
+    
+
+
+
 
     await client.db("admin").command({ ping: 1 });
     console.log(
