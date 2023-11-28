@@ -81,6 +81,35 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result);
     });
+    app.get("/allUsers", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
+
+    // block make admin , make volunteer unblock  patch allUsers 
+
+    app.patch("/allUsers", async (req, res) => {
+      try {
+        const body = req.body;
+        if (!req.query.id) {
+          return res.status(400).json({ error: "No ID provided" });
+        }
+
+        const id = req.query.id;
+        console.log(id);
+        const query = { _id: new ObjectId(id) };
+
+        const result = await userCollection.updateOne(query, {
+          $set: body,
+        });
+        res.json(result);
+      } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
     //user update profile from dashboard
     app.put("/allUsers", async (req, res) => {
       try {
@@ -167,6 +196,13 @@ async function run() {
     app.post("/allRequest", async (req, res) => {
       const user = req.body;
       const result = await donorReqCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // golbal req 
+
+    app.get("/globalReq", async (req, res) => {
+      const result = await donorReqCollection.find().toArray();
       res.send(result);
     });
 
@@ -314,6 +350,28 @@ async function run() {
         res.status(500).json({ error: "Internal server error" });
       }
     });
+
+    // donate inprogress working status 
+     app.patch("/allReqDonate", async (req, res) => {
+       try {
+         const body = req.body;
+         if (!req.query.id) {
+           return res.status(400).json({ error: "No ID provided" });
+         }
+
+         const id = req.query.id;
+         console.log(id);
+         const query = { _id: new ObjectId(id) };
+
+         const result = await donorReqCollection.updateOne(query, {
+           $set: body,
+         });
+         res.json(result);
+       } catch (error) {
+         console.error("Error updating request:", error);
+         res.status(500).json({ error: "Internal server error" });
+       }
+     });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
