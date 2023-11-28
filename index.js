@@ -30,7 +30,9 @@ async function run() {
     // collections---------
 
     const userCollection = client.db("assignment12DB").collection("users");
-    const donorReqCollection = client.db("assignment12DB").collection("request");
+    const donorReqCollection = client
+      .db("assignment12DB")
+      .collection("request");
 
     // jwt related api---------
 
@@ -42,11 +44,7 @@ async function run() {
       res.send({ token });
     });
 
-
-
-
     // verfication middleware ----------
-
 
     const verifyToken = (req, res, next) => {
       // console.log('inside verify token', req.headers.authorization);
@@ -86,29 +84,26 @@ async function run() {
     //user update profile from dashboard
     app.put("/allUsers", async (req, res) => {
       try {
-        const body = req.body;
+        const { name, imageUrl, upazila, district, BloodGroup } = req.body;
         if (!req.query.email) {
           return res.status(408).json({ error: "No email provided" });
         }
 
         const email = req.query.email;
         const filter = { email: email };
-        const options = { upsert: true };
+
+        const query = {};
+
+        if (name) query.name = name;
+        if (imageUrl) query.imageUrl = imageUrl;
+        if (upazila) query.upazila = upazila;
+        if (district) query.district = district;
+        if (imageUrl) query.BloodGroup = BloodGroup;
 
         const updateDoc = {
-          $set: {
-            name: body.name,
-            imageUrl: body.imageUrl,
-            upazila: body.upazila,
-            district: body.district,
-            BloodGroup: body.BloodGroup,
-          },
+          $set: query,
         };
-        const result = await userCollection.updateOne(
-          filter,
-          updateDoc,
-          options
-        );
+        const result = await userCollection.updateOne(filter, updateDoc);
         res.json(result);
       } catch (error) {
         console.error("Error fetching user:", error);
@@ -118,7 +113,7 @@ async function run() {
 
     // SingleUser
 
-    app.get("/user",verifyToken, async (req, res) => {
+    app.get("/user", verifyToken, async (req, res) => {
       try {
         if (!req.query.email) {
           return res.status(400).json({ error: "No email provided" });
@@ -134,17 +129,50 @@ async function run() {
       }
     });
 
+    //  search single user
+
+    app.get("/searchUser", async (req, res) => {
+
+      const upazila = req.query.upazila;
+      const district = req.query.district;
+      const bloodGroup = req.query.bloodGroup;
+
+      console.log("Received Query Parameters:", {
+        upazila,
+        district,
+        bloodGroup,
+      });
+
+      const query = {};
+      if (district) query.district = district;
+      if (upazila) query.upazila = upazila;
+      if (bloodGroup) query.BloodGroup = bloodGroup;
+
+      console.log("Constructed Query:", query);
+
+      try {
+        const result = await userCollection.find(query).toArray();
+        console.log("Query Result:", result);
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+
+    
+
     // donor request ------------
-    app.post('/allRequest',async(req,res) => {
+    app.post("/allRequest", async (req, res) => {
       const user = req.body;
       const result = await donorReqCollection.insertOne(user);
       res.send(result);
-    })
+    });
 
+    // allReq  get
 
-    // allReq 
-
-    app.get('/allRequest',async(req,res)=>{
+    app.get("/allRequest", async (req, res) => {
       try {
         if (!req.query.email) {
           return res.status(400).json({ error: "No email provided" });
@@ -158,10 +186,26 @@ async function run() {
         console.error("Error fetching user:", error);
         res.status(500).json({ error: "Internal server error" });
       }
-      
-    })
+    });
 
-    //  SingleDonorReq 
+    // allPendingReq  get
+    app.get("/allPendingReq", async (req, res) => {
+      try {
+        if (!req.query.workStatus) {
+          return res.status(400).json({ error: "No email provided" });
+        }
+
+        const status = req.query.workStatus;
+        const query = { workStatus: status };
+        const result = await donorReqCollection.find(query).toArray();
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    //  SingleDonorReq
 
     app.get("/allRequest", verifyToken, async (req, res) => {
       try {
@@ -178,7 +222,7 @@ async function run() {
         res.status(500).json({ error: "Internal server error" });
       }
     });
-  // edit single req 
+    // edit single req
 
     const { ObjectId } = require("mongodb");
 
@@ -190,8 +234,8 @@ async function run() {
         }
 
         const id = req.query.id;
-        console.log(id)
-        const filter = { _id: new ObjectId(id) }; 
+        console.log(id);
+        const filter = { _id: new ObjectId(id) };
         const options = { upsert: true };
 
         const updateDoc = {
@@ -218,7 +262,7 @@ async function run() {
       }
     });
 
-    // delete single Req 
+    // delete single Req
     app.delete("/allRequest", async (req, res) => {
       try {
         const body = req.body;
@@ -248,32 +292,28 @@ async function run() {
       }
     });
 
+    // donor update working status
 
-    // donor update working status 
+    app.patch("/allRequest", async (req, res) => {
+      try {
+        const body = req.body;
+        if (!req.query.id) {
+          return res.status(400).json({ error: "No ID provided" });
+        }
 
-   app.patch("/allRequest", async (req, res) => {
-     try {
-       const body = req.body;
-       if (!req.query.id) {
-         return res.status(400).json({ error: "No ID provided" });
-       }
+        const id = req.query.id;
+        console.log(id);
+        const query = { _id: new ObjectId(id) };
 
-       const id = req.query.id;
-       console.log(id);
-       const query = { _id: new ObjectId(id) };
-
-       const result = await donorReqCollection.updateOne(query, { $set: body });
-       res.json(result);
-     } catch (error) {
-       console.error("Error updating request:", error);
-       res.status(500).json({ error: "Internal server error" });
-     }
-   });
-
-    
-
-
-
+        const result = await donorReqCollection.updateOne(query, {
+          $set: body,
+        });
+        res.json(result);
+      } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
