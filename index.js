@@ -3,6 +3,8 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
+
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
@@ -30,6 +32,7 @@ async function run() {
     // collections---------
 
     const userCollection = client.db("assignment12DB").collection("users");
+    const BlogCollection = client.db("assignment12DB").collection("Blogs");
     const donorReqCollection = client
       .db("assignment12DB")
       .collection("request");
@@ -73,6 +76,34 @@ async function run() {
       next();
     };
 
+    // use verify donor after verifyToken
+    const verifyDonor = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "donor";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
+    // payment intent 
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log("amount", amount);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
     // registerd User----------
 
     //user post form register
@@ -86,10 +117,9 @@ async function run() {
       res.send(result);
     });
 
+    // block make admin , make volunteer unblock  patch allUsers
 
-    // block make admin , make volunteer unblock  patch allUsers 
-
-    app.patch("/allUsers", async (req, res) => {
+    app.patch("/allUsers", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const body = req.body;
         if (!req.query.id) {
@@ -161,7 +191,6 @@ async function run() {
     //  search single user
 
     app.get("/searchUser", async (req, res) => {
-
       const upazila = req.query.upazila;
       const district = req.query.district;
       const bloodGroup = req.query.bloodGroup;
@@ -189,9 +218,6 @@ async function run() {
       }
     });
 
-
-    
-
     // donor request ------------
     app.post("/allRequest", async (req, res) => {
       const user = req.body;
@@ -199,9 +225,9 @@ async function run() {
       res.send(result);
     });
 
-    // golbal req 
+    // golbal req
 
-    app.get("/globalReq", async (req, res) => {
+    app.get("/globalReq", verifyToken, verifyAdmin, async (req, res) => {
       const result = await donorReqCollection.find().toArray();
       res.send(result);
     });
@@ -351,27 +377,62 @@ async function run() {
       }
     });
 
-    // donate inprogress working status 
-     app.patch("/allReqDonate", async (req, res) => {
-       try {
-         const body = req.body;
-         if (!req.query.id) {
-           return res.status(400).json({ error: "No ID provided" });
-         }
+    // donate inprogress working status
+    app.patch("/allReqDonate", async (req, res) => {
+      try {
+        const body = req.body;
+        if (!req.query.id) {
+          return res.status(400).json({ error: "No ID provided" });
+        }
 
-         const id = req.query.id;
-         console.log(id);
-         const query = { _id: new ObjectId(id) };
+        const id = req.query.id;
+        console.log(id);
+        const query = { _id: new ObjectId(id) };
 
-         const result = await donorReqCollection.updateOne(query, {
-           $set: body,
-         });
-         res.json(result);
-       } catch (error) {
-         console.error("Error updating request:", error);
-         res.status(500).json({ error: "Internal server error" });
-       }
-     });
+        const result = await donorReqCollection.updateOne(query, {
+          $set: body,
+        });
+        res.json(result);
+      } catch (error) {
+        console.error("Error updating request:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    //  all blogs creating  -- post
+    app.post("/allBlogs", async (req, res) => {
+      const Blog = req.body;
+      const result = await BlogCollection.insertOne(Blog);
+      res.send(result);
+    });
+
+    // all blogs get
+    app.get("/allBlogs", async (req, res) => {
+      const result = await BlogCollection.find().toArray();
+      res.send(result);
+    });
+
+    // unPublish publish patch for admin content management
+    app.patch("/allBlogs", verifyToken, verifyAdmin, async (req, res) => {
+      try {
+        const body = req.body;
+        if (!req.query.id) {
+          return res.status(400).json({ error: "No ID provided" });
+        }
+
+        const id = req.query.id;
+        console.log(id);
+        const query = { _id: new ObjectId(id) };
+
+        const result = await BlogCollection.updateOne(query, {
+          $set: body,
+        });
+        res.json(result);
+      } catch (error) {
+        console.error("Error Patching request:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
