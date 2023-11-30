@@ -36,6 +36,7 @@ async function run() {
     const donorReqCollection = client
       .db("assignment12DB")
       .collection("request");
+       const FundCollection = client.db("assignment12DB").collection("fund");
 
     // jwt related api---------
 
@@ -119,7 +120,7 @@ async function run() {
 
     // block make admin , make volunteer unblock  patch allUsers
 
-    app.patch("/allUsers", verifyToken, verifyAdmin, async (req, res) => {
+    app.patch("/allUsers", async (req, res) => {
       try {
         const body = req.body;
         if (!req.query.id) {
@@ -172,7 +173,7 @@ async function run() {
 
     // SingleUser
 
-    app.get("/user", verifyToken, async (req, res) => {
+    app.get("/user", async (req, res) => {
       try {
         if (!req.query.email) {
           return res.status(400).json({ error: "No email provided" });
@@ -227,7 +228,7 @@ async function run() {
 
     // golbal req
 
-    app.get("/globalReq", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/globalReq",  async (req, res) => {
       const result = await donorReqCollection.find().toArray();
       res.send(result);
     });
@@ -269,7 +270,7 @@ async function run() {
 
     //  SingleDonorReq
 
-    app.get("/allRequest", verifyToken, async (req, res) => {
+    app.get("/allRequest", async (req, res) => {
       try {
         if (!req.query.email) {
           return res.status(400).json({ error: "No email provided" });
@@ -407,13 +408,28 @@ async function run() {
     });
 
     // all blogs get
-    app.get("/allBlogs", async (req, res) => {
+    app.get("/allBlogs",  async (req, res) => {
       const result = await BlogCollection.find().toArray();
       res.send(result);
     });
+    app.get("/PublishedBlogs", async (req, res) => {
+      try {
+        if (!req.query.status) {
+          return res.status(400).json({ error: "No email provided" });
+        }
+
+        const status = req.query.status;
+        const query = { blogStatus: status };
+        const result = await BlogCollection.find(query).toArray();
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
 
     // unPublish publish patch for admin content management
-    app.patch("/allBlogs", verifyToken, verifyAdmin, async (req, res) => {
+    app.patch("/allBlogs", async (req, res) => {
       try {
         const body = req.body;
         if (!req.query.id) {
@@ -433,6 +449,16 @@ async function run() {
         res.status(500).json({ error: "Internal server error" });
       }
     });
+
+
+    // fund post api 
+    app.post("/funds", async (req, res) => {
+      const fund = req.body;
+      const result = await FundCollection.insertOne(fund);
+      res.send(result);
+    });
+
+    
 
     await client.db("admin").command({ ping: 1 });
     console.log(
